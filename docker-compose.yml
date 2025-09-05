@@ -1,0 +1,98 @@
+name: oracle-du-ballon
+
+services:
+  db:
+    image: postgres:16
+    container_name: odb_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?err}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err}
+      POSTGRES_DB: ${POSTGRES_DB:?err}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: odb_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://$${DB_USER}:$${DB_PASSWORD}@db:$${DB_PORT}/$${DB_NAME}}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      FD_API_KEY: ${FD_API_KEY}
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+      UVICORN_HOST: 0.0.0.0
+      UVICORN_PORT: 8000
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "uvicorn app.main:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000}"
+    healthcheck:
+      # Utilise curl (présent dans l'image backend)
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: odb_etl
+    # Job one-shot : ne pas relancer en boucle
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://$${DB_USER}:$${DB_PASSWORD}@db:$${DB_PORT}/$${DB_NAME}}
+      FD_API_KEY: ${FD_API_KEY}
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+    # L'image contient déjà CMD ["python","-m","etl.run"], donc on n'impose rien ici.
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: odb_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      PORT: ${FRONTEND_PORT:-5173}
+      HOST: 0.0.0.0
+    ports:
+      - "5173:5173"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+volumes:
+  db_data:
