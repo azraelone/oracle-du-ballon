@@ -41,6 +41,17 @@
 
 ---
 
+## 📋 Vue Kanban (simplifiée)
+
+| To Do (à faire) | In Progress (en cours) | Done (terminé) |
+|-----------------|------------------------|----------------|
+| Backend FastAPI (Phase 2) | Rien pour le moment | ETL Phase 1 (schéma, jobs, tests, doc, push Git) |
+| Module prédiction (Phase 3) | | |
+| Frontend React (Phase 4) | | |
+| Déploiement CI/CD (Phase 5) | | |
+
+---
+
 ## Dernière mise à jour
 - **Phase 1 terminée avec succès (Janvier 2025).**
 - Actuellement : préparation **Phase 2 — Backend**.
