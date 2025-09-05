@@ -1,18 +1,29 @@
-# Phase 1 — ETL / Données (Ligue 1) avec fallback API
+# Phase 1 — ETL / Données (Ligue 1)
 
-## Variables requises (.env)
-- DATABASE_URL (ex: postgresql+psycopg2://oracle:oracle@db:5432/oracle_db)
-- API_FOOTBALL_KEY (API-Sports)
-- FOOTBALL_DATA_KEY (Football-Data.org)
-- L1_LEAGUE_ID=61
-- SEASON=2023   # (API-Sports Gratuit: saisons autorisées 2021–2023)
-- ETL_SOURCE=auto  # apisports | footballdata | auto (auto = tente API-Sports puis bascule FD)
-- FD_COMP=FL1
+## 📦 Schéma Postgres
+Tables créées automatiquement :
+- `teams(id, name, short_name, crest_url)`
+- `players(id, team_id, name, position)`
+- `matches(id, season, round, date_utc, home_id, away_id, goals_home, goals_away, status)`
+- `events(match_id, minute, type, player_id, team_id)`
 
-## Lancer (idempotent)
+Idempotent : rejouer le script ne casse rien.
+
+---
+
+## 🔑 Variables `.env`
+- `DATABASE_URL=postgresql+psycopg2://oracle:oracle@db:5432/oracle_db`
+- `FOOTBALL_DATA_KEY=…` (clé Football-Data.org)
+- `API_FOOTBALL_KEY=…` (clé API-Sports, utilisée seulement si tu actives ETL_SOURCE=apisports/auto)
+- `ETL_SOURCE=footballdata` (**verrouillé pour cohérence IDs**)
+- `FD_COMP=FL1`
+- `SEASON=2023` (plan gratuit Football-Data autorise 2023)
+
+---
+
+## ⚙️ Jobs ETL
+
+### 1) Création du schéma
 ```bash
-docker compose build etl
 docker compose run --rm -T etl python -m etl.scripts.create_schema
-docker compose run --rm -T etl python -m etl.jobs.import_teams
-docker compose run --rm -T etl python -m etl.jobs.import_fixtures --last 10
-docker compose run --rm -T etl python -m etl.jobs.import_events --limit 10  # NOP si source=footballdata
+
